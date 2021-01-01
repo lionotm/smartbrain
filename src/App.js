@@ -36,8 +36,32 @@ class App extends Component {
       box: [], 
       route: 'signin',
       isSignedIn: false,
+      user: {
+        id: '',
+        name: '',
+        email: '',
+        entries: 0,
+        joined: '',
+      },
     };
   }
+
+  loadUser = (data) => {
+    this.setState({ user: {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        entries: data.entries,
+        joined: data.joined,
+    }})
+  }
+
+  // test connection between front and back end
+  // componentDidMount() {
+  //   fetch('http://localhost:3000/')
+  //   .then(response => response.json())
+  //   .then(console.log)
+  // }
 
   calculateFaceLocation = (data) => {
     // const clarifaiFace = data.outputs[0].data.regions[0].region_info.bounding_box;
@@ -76,14 +100,29 @@ class App extends Component {
     this.setState({input: event.target.value});
   }
 
-  onButtonSubmit = () => {
+  onPictureSubmit = () => {
     this.setState({imageUrl: this.state.input})
     app.models
     .predict(
       Clarifai.FACE_DETECT_MODEL,
       this.state.input // this.state.imagURL will not work because react batch multiple calls to setSetate() into a single call to re-render the component a single time. Therefore, the imageUrl has not been updated when we called the Clarifai function. A way to go around this is using a callback function: setState(updater, callback)
     )
-    .then(response => this.displayFaceBox(this.calculateFaceLocation(response)))
+    .then(response => {
+      if (response) {
+      fetch('http://localhost:3000/image', {
+        method: 'put',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          id: this.state.user.id
+        })
+      })
+      .then(response => response.json())
+      .then(count => {
+        this.setState(Object.assign(this.state.user, { entries: count})) //Object.assign to only update entries in user
+      })
+    } 
+    this.displayFaceBox(this.calculateFaceLocation(response)) 
+    })
     .catch(err => console.log(err));
   }
 
@@ -107,16 +146,16 @@ class App extends Component {
         { route === 'home' 
           ? <div>
               <Logo />
-              <Rank />
+              <Rank name={this.state.user.name} entries={this.state.user.entries} />
               <ImageLinkForm 
                 onInputChange={this.onInputChange} 
-                onButtonSubmit={this.onButtonSubmit}/>
+                onPictureSubmit={this.onPictureSubmit}/>
               <FaceRecognition box={box} imageUrl={imageUrl}/>
             </div>
           : (
             route === 'signin' 
-            ? <Signin onRouteChange={this.onRouteChange}/>
-            : <Register onRouteChange={this.onRouteChange}/>
+            ? <Signin loadUser={this.loadUser} onRouteChange={this.onRouteChange}/>
+            : <Register loadUser={this.loadUser} onRouteChange={this.onRouteChange}/>
           )
         }
       </div>
