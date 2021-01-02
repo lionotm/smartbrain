@@ -8,12 +8,8 @@ import Register from './components/Register/Register';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition';
 import Particles from 'react-particles-js';
 import { Component } from 'react';
-import Clarifai from 'clarifai';
 
-//You must add your own API key here from Clarifai.
-const app = new Clarifai.App({
-  apiKey: '299374f86cfb4acfb0dacc5702d17623'
- });
+
 
 const particlesOptions ={
   particles: {
@@ -27,23 +23,25 @@ const particlesOptions ={
   }
 }
 
+const initialState = {
+  input: '',
+  imageUrl: '',
+  box: [], 
+  route: 'signin',
+  isSignedIn: false,
+  user: {
+    id: '',
+    name: '',
+    email: '',
+    entries: 0,
+    joined: '',
+  }
+}
+
 class App extends Component {
   constructor() {
     super();
-    this.state = {
-      input: '',
-      imageUrl: '',
-      box: [], 
-      route: 'signin',
-      isSignedIn: false,
-      user: {
-        id: '',
-        name: '',
-        email: '',
-        entries: 0,
-        joined: '',
-      },
-    };
+    this.state = initialState;
   }
 
   loadUser = (data) => {
@@ -63,7 +61,7 @@ class App extends Component {
   //   .then(console.log)
   // }
 
-  calculateFaceLocation = (data) => {
+  calculateFaceLocation = (data) => {  
     // const clarifaiFace = data.outputs[0].data.regions[0].region_info.bounding_box;
     const clarifaiFace2 = data.outputs[0].data.regions.map(face => face.region_info.bounding_box);
 
@@ -101,16 +99,19 @@ class App extends Component {
   }
 
   onPictureSubmit = () => {
-    this.setState({imageUrl: this.state.input})
-    app.models
-    .predict(
-      Clarifai.FACE_DETECT_MODEL,
-      this.state.input // this.state.imagURL will not work because react batch multiple calls to setSetate() into a single call to re-render the component a single time. Therefore, the imageUrl has not been updated when we called the Clarifai function. A way to go around this is using a callback function: setState(updater, callback)
-    )
+    this.setState({imageUrl: this.state.input});
+    fetch('http://localhost:3000/imageurl', {
+      method: 'post',  
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        input: this.state.input
+      })
+    })
+    .then(response => response.json())
     .then(response => {
       if (response) {
       fetch('http://localhost:3000/image', {
-        method: 'put',
+        method: 'put',  
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           id: this.state.user.id
@@ -120,17 +121,18 @@ class App extends Component {
       .then(count => {
         this.setState(Object.assign(this.state.user, { entries: count})) //Object.assign to only update entries in user
       })
+      .catch(console.log)
     } 
-    this.displayFaceBox(this.calculateFaceLocation(response)) 
+     this.displayFaceBox(this.calculateFaceLocation(response)) 
     })
     .catch(err => console.log(err));
   }
 
   onRouteChange = (route) => {
     if (route === 'signout') {
-      this.setState({isSignedIn: false})
+      this.setState(initialState)
     } else if (route === 'home') {
-      this.setState({isSignedIn: true})
+      this.setState({isSignedIn: true, imageUrl: ''})
     }
       this.setState({route: route});
   }
